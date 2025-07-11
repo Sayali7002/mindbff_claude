@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 262 81% 93%;
+    --foreground: 220 14% 25%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 14% 25%;
+ 
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 14% 25%;
+ 
+    --primary: 260 30% 45%; /* Tailwind purple-500: #a855f7 */
+    --primary-foreground: 0 0% 100%; /* white */
+ 
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 220 14% 25%;
+ 
+    --muted: 214 32% 91%;
+    --muted-foreground: 220 8% 46%;
+ 
+    --accent: 214 32% 91%;
+    --accent-foreground: 220 14% 25%;
+ 
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 195 84% 54%;
+ 
+    --radius: 0.75rem;
+
+    /* Mindfulness color palette */
+  --mindfulness-blue-bg: #dbeafe;      /* Tailwind blue-100 */
+  --mindfulness-blue-text: #1d4ed8;    /* Tailwind blue-700 */
+  --mindfulness-blue-border: #bfdbfe;  /* Tailwind blue-200 */
+
+  --mindfulness-pink-bg: #ffe4e6;      /* Tailwind pink-100 */
+  --mindfulness-pink-text: #be185d;    /* Tailwind pink-700 */
+  --mindfulness-pink-border: #fbcfe8;  /* Tailwind pink-200 */
+
+  --mindfulness-green-bg: #d1fae5;     /* Tailwind green-100 */
+  --mindfulness-green-text: #047857;   /* Tailwind green-700 */
+  --mindfulness-green-border: #bbf7d0; /* Tailwind green-200 */
+
+  --mindfulness-purple-bg: #ede9fe;    /* Tailwind purple-100 */
+  --mindfulness-purple-text: #6d28d9;  /* Tailwind purple-700 */
+  --mindfulness-purple-border: #ddd6fe;/* Tailwind purple-200 */
+
+  --mindfulness-yellow-bg: #fef9c3;    /* Tailwind yellow-100 */
+  --mindfulness-yellow-text: #b45309;  /* Tailwind yellow-700 */
+  --mindfulness-yellow-border: #fef08a;/* Tailwind yellow-200 */
+
+  --mindfulness-gray-bg: #f3f4f6;      /* Tailwind gray-100 */
+  --mindfulness-gray-text: #374151;    /* Tailwind gray-700 */
+  --mindfulness-gray-border: #e5e7eb;  /* Tailwind gray-200 */
+
+  /* Optionally add orange, teal, red if needed */
+  --mindfulness-orange-bg: #fff7ed;    /* Tailwind orange-50 */
+  --mindfulness-orange-text: #c2410c;  /* Tailwind orange-800 */
+  --mindfulness-teal-bg: #ccfbf1;      /* Tailwind teal-50 */
+  --mindfulness-teal-text: #134e4a;    /* Tailwind teal-800 */
+  --mindfulness-red-bg: #fee2e2;       /* Tailwind red-100 */
+  --mindfulness-red-text: #b91c1c;     /* Tailwind red-700 */
+
+  }
+ 
+  .dark {
+    --background: 262 20% 10%;
+    --foreground: 210 40% 98%;
+ 
+    --card: 220 20% 10%;
+    --card-foreground: 210 40% 98%;
+ 
+    --popover: 220 20% 10%;
+    --popover-foreground: 210 40% 98%;
+ 
+    --primary: 262 87% 66%; /* Tailwind purple-500: #a855f7 */
+    --primary-foreground: 0 0% 100%; /* white */
+ 
+    --secondary: 220 15% 20%;
+    --secondary-foreground: 210 40% 98%;
+ 
+    --muted: 220 15% 20%;
+    --muted-foreground: 214 15% 75%;
+ 
+    --accent: 220 15% 20%;
+    --accent-foreground: 210 40% 98%;
+ 
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+ 
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 195 84% 54%;
+  }
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90;
+}
+
+.btn-secondary {
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary/90;
+}
+
+/* Links styling */
+a {
+  @apply text-primary hover:text-primary/80;
+}
+
+/* Custom text highlights */
+.text-highlight {
+  @apply text-primary font-semibold;
+}
+
+/* Map blue color classes to primary color */
+@layer utilities {
+  /* Background colors */
+  .bg-blue-50 {
+    @apply bg-primary/10;
+  }
+  .bg-blue-100 {
+    @apply bg-primary/20;
+  }
+  .bg-blue-500 {
+    @apply bg-primary;
+  }
+  .bg-blue-600 {
+    @apply bg-primary;
+  }
+  .bg-blue-700 {
+    @apply bg-primary/90;
+  }
+  
+  /* Text colors */
+  .text-blue-500 {
+    @apply text-primary;
+  }
+  .text-blue-600 {
+    @apply text-primary;
+  }
+  .text-blue-700 {
+    @apply text-primary/90;
+  }
+  .text-blue-800 {
+    @apply text-primary/80;
+  }
+  
+  /* Border colors */
+  .border-blue-100 {
+    @apply border-primary/20;
+  }
+  
+  /* Hover states */
+  .hover\:bg-blue-100:hover {
+    @apply hover:bg-primary/20;
+  }
+  .hover\:bg-blue-600:hover {
+    @apply hover:bg-primary;
+  }
+  .hover\:bg-blue-700:hover {
+    @apply hover:bg-primary/90;
+  }
+  .hover\:text-blue-700:hover {
+    @apply hover:text-primary/90;
+  }
+  .hover\:text-blue-800:hover {
+    @apply hover:text-primary/80;
+  }
+  
+  /* Focus states */
+  .focus\:ring-blue-500:focus {
+    @apply focus:ring-primary;
+  }
+}
+
+/* Rest of existing styles */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom styles for a calming, minimalist experience */
+.gradient-bg {
+  background-color: hsl(196, 73%, 97%);
+}
+
+.card-hover {
+  @apply hover:shadow-lg hover:scale-[1.01];
+  transition: all 0.3s ease-in-out;
+}
+
+.soft-shadow {
+  @apply shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-blue-200 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-blue-300;
+}
+
+body {
+  background-color: #f0f4f8;
+}
+
+/* Make all inputs rounded by default */
+input, textarea, select {
+  border-radius: 9999px; /* rounded-full equivalent */
+}
+
+textarea {
+  border-radius: 1.5rem; /* slightly less rounded for textareas */
+}
+
+.dot-flashing {
+  position: relative;
+  width: 1.5em;
+  height: 0.5em;
+}
+.dot-flashing::before, .dot-flashing::after, .dot-flashing {
+  content: '';
+  display: inline-block;
+  position: absolute;
+  left: 0;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: #60a5fa;
+  animation: dotFlashing 1s infinite linear alternate;
+}
+.dot-flashing::after {
+  left: 1em;
+  animation-delay: 0.5s;
+}
+.dot-flashing {
+  left: 0.5em;
+  animation-delay: 0.25s;
+}
+@keyframes dotFlashing {
+  0% { opacity: 0.2; }
+  50%, 100% { opacity: 1; }
+} 
