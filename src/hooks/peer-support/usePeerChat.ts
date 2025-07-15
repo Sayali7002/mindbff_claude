@@ -76,6 +76,7 @@ export function usePeerChat(): UsePeerChatReturn {
           schema: 'public', 
           table: 'peer_support_chats'
         }, async (payload) => {
+          // On INSERT, fetchMessages is called to fetch the most recent messages for both sender and receiver, ensuring the UI updates in real time.
           console.log('Real-time INSERT received:', payload);
           
           // Check if this message is relevant to our conversation

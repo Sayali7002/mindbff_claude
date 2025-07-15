@@ -29,7 +29,10 @@ export default function ChatPage() {
     fetchMessages,
     sendMessage,
     initializeChat,
-    cleanup
+    cleanup,
+    subscriptionStatus,
+    refreshSubscription,
+    testRealtime
   } = usePeerChat();
 
   // Validate chat ID format
@@ -174,8 +177,19 @@ export default function ChatPage() {
     <PeerChat 
       peer={peer}
       onClose={() => router.push('/peer-support')}
-      initialMessages={messages}
-      initialIsAnonymous={isAnonymous}
+      messages={messages}
+      isAnonymous={isAnonymous}
+      setIsAnonymous={setIsAnonymous}
+      sendMessage={sendMessage}
+      deleteChat={() => {}} // Placeholder for deleteChat
+      fetchMessages={fetchMessages}
+      initializeChat={initializeChat}
+      subscriptionStatus={subscriptionStatus}
+      refreshSubscription={refreshSubscription}
+      error={chatError}
+      cleanup={cleanup}
+      testRealtime={testRealtime}
+      isLoading={isChatLoading}
     />
   );
 } 

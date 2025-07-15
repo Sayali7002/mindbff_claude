@@ -1,34 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { PeerMatch, ChatMessage } from '@/types/peer-support';
-import { usePeerChat } from '@/hooks/peer-support/usePeerChat';
 
 interface PeerChatProps {
   peer: PeerMatch;
   onClose: () => void;
-  initialMessages?: ChatMessage[];
-  initialIsAnonymous?: boolean;
+  messages: ChatMessage[];
+  isAnonymous: boolean;
+  setIsAnonymous: (anonymous: boolean) => void;
+  sendMessage: (receiverId: string, message: string) => Promise<ChatMessage | null>;
+  deleteChat: (peerId: string) => Promise<boolean>;
+  fetchMessages: (peerId: string) => Promise<ChatMessage[]>;
+  initializeChat: (peer: PeerMatch, initialMessages?: ChatMessage[]) => Promise<void>;
+  subscriptionStatus: string;
+  refreshSubscription: () => void;
+  error: string | null;
+  cleanup: () => void;
+  testRealtime: () => Promise<void>;
+  isLoading: boolean;
 }
 
-export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymous = false }: PeerChatProps) {
-  const {
-    messages,
-    isLoading,
-    isAnonymous,
-    setIsAnonymous,
-    sendMessage: sendMessageToApi,
-    deleteChat,
-    fetchMessages,
-    initializeChat,
-    subscriptionStatus,
-    refreshSubscription,
-    error: chatError,
-    cleanup,
-    testRealtime
-  } = usePeerChat();
-  
+export function PeerChat({
+  peer,
+  onClose,
+  messages,
+  isAnonymous,
+  setIsAnonymous,
+  sendMessage,
+  deleteChat,
+  fetchMessages,
+  initializeChat,
+  subscriptionStatus,
+  refreshSubscription,
+  error,
+  cleanup,
+  testRealtime,
+  isLoading
+}: PeerChatProps) {
   const [chatMessage, setChatMessage] = useState('');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(initialMessages);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(messages);
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [showNewMessageNotification, setShowNewMessageNotification] = useState(false);
@@ -53,7 +63,7 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
       initializedPeerRef.current = peer.id;
       
       // Initialize the chat with real-time subscription
-      initializeChat(peer, initialMessages)
+      initializeChat(peer, messages)
         .then(() => {
           console.log("Chat initialized successfully");
         })
@@ -61,12 +71,12 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
           console.error("Error initializing chat:", err);
         });
     }
-  }, [peer?.id, initialMessages, initializeChat]);
+  }, [peer?.id, messages, initializeChat]);
 
   // Set initial anonymous mode
   useEffect(() => {
-    setIsAnonymous(initialIsAnonymous);
-  }, [initialIsAnonymous, setIsAnonymous]);
+    setIsAnonymous(isAnonymous);
+  }, [isAnonymous, setIsAnonymous]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -135,7 +145,7 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
     
     try {
       // Send to API
-      const sentMessage = await sendMessageToApi(peer.id, messageText);
+      const sentMessage = await sendMessage(peer.id, messageText);
       
       if (sentMessage) {
         // Remove optimistic message and let real-time update handle it
@@ -347,8 +357,8 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
         </div>
         
         {/* Error display */}
-        {chatError && (
-  <div className="flex-shrink-0 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">            <p className="text-red-700 text-sm">{chatError}</p>
+        {error && (
+  <div className="flex-shrink-0 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">            <p className="text-red-700 text-sm">{error}</p>
           </div>
         )}
         
