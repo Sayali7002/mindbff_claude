@@ -88,17 +88,13 @@ export function PeerChat({
 
   // Update messages when they change from the hook
   useEffect(() => {
-    if (messages.length > 0) {
-      const previousMessageCount = chatMessages.length;
-      setChatMessages(messages);
-      
-      // Show notification for new messages if user is scrolled up
-      if (messages.length > previousMessageCount && userScrolledUp) {
-        setShowNewMessageNotification(true);
-        // Play notification sound
-        if (audioRef.current) {
-          audioRef.current.play().catch(console.error);
-        }
+    setChatMessages(messages);
+    // Show notification for new messages if user is scrolled up
+    if (messages.length > chatMessages.length && userScrolledUp) {
+      setShowNewMessageNotification(true);
+      // Play notification sound
+      if (audioRef.current) {
+        audioRef.current.play().catch(console.error);
       }
     }
   }, [messages, userScrolledUp]);
@@ -233,6 +229,7 @@ export function PeerChat({
 
   // Combine real messages with optimistic messages
   const allMessages = [...chatMessages, ...optimisticMessages];
+  console.log('Rendering messages:', allMessages);
 
   // Get connection status color and text
   const getConnectionStatus = () => {
@@ -407,11 +404,13 @@ export function PeerChat({
         
  {/* Chat messages - scrollable area */}
  <div className="flex-1 bg-white rounded-lg shadow-sm p-4 overflow-y-auto mb-4 relative min-h-0" ref={messagesContainerRef}>
-    {allMessages.map((msg, index) => (
-            <div 
-              key={msg.id || index} 
-              className={`mb-4 ${msg.sender === 'you' ? 'text-right' : ''} ${msg.sender === 'system' ? 'text-center' : ''}`}
-            >
+    {allMessages.map((msg, index) => {
+      console.log('Message object:', msg);
+      return (
+        <div 
+          key={msg.id || index} 
+          className={`mb-4 ${msg.sender === 'you' ? 'text-right' : ''} ${msg.sender === 'system' ? 'text-center' : ''}`}
+        >
               {msg.sender !== 'system' && (
                 <div className="text-xs text-gray-500 mb-1">
                   {msg.sender === 'you' ? (msg.isAnonymous ? 'Anonymous' : 'You') : msg.sender}
@@ -435,7 +434,8 @@ export function PeerChat({
                 {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
               </div>
             </div>
-          ))}
+          );
+        })}
           <div ref={messagesEndRef} />
           
           {/* New message notification */}
