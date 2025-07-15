@@ -90,7 +90,16 @@ export function usePeerChat(): UsePeerChatReturn {
             setMessages(prev => {
               // Prevent duplicates
               if (prev.some(m => m.id === message.id)) return prev;
-              const updated = [...prev, { ...message, timestamp: new Date(message.timestamp) }];
+              const chatMessage = {
+                id: message.id,
+                sender: message.sender_id === userId ? 'you' : (message.sender_name || 'Peer'),
+                message: message.message,
+                timestamp: new Date(message.timestamp),
+                isAnonymous: message.is_anonymous,
+                senderId: message.sender_id,
+                receiverId: message.receiver_id
+              };
+              const updated = [...prev, chatMessage];
               try {
                 localStorage.setItem(getChatStorageKey(userId, peerId), JSON.stringify(updated));
               } catch (e) { /* ignore quota errors */ }
