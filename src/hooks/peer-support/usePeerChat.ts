@@ -22,6 +22,11 @@ interface UsePeerChatReturn {
   testRealtime: () => Promise<void>;
 }
 
+// Utility for localStorage chat key
+function getChatStorageKey(userId: string, peerId: string) {
+  return `peerchat_${[userId, peerId].sort().join('_')}`;
+}
+
 export function usePeerChat(): UsePeerChatReturn {
   const [selectedPeer, setSelectedPeer] = useState<PeerMatch | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -64,8 +69,7 @@ export function usePeerChat(): UsePeerChatReturn {
     try {
       // Create unique channel name for this conversation (order userId and peerId lexicographically)
       const [idA, idB] = userId < peerId ? [userId, peerId] : [peerId, userId];
-      const channelName = `peer_chat_${idA}_${idB}`; 
-     {/*  const channelName = `peer_chat_${userId}_${peerId}`;*/}
+      const channelName = `peer_chat_${idA}_${idB}`;
       console.log(`Creating channel: ${channelName}`);
 
       // Create subscription that listens for messages in both directions
@@ -76,19 +80,31 @@ export function usePeerChat(): UsePeerChatReturn {
           schema: 'public', 
           table: 'peer_support_chats'
         }, async (payload) => {
+          // On INSERT, use the payload's new message directly
           console.log('Real-time INSERT received:', payload);
-          
-          // Check if this message is relevant to our conversation
           const message = payload.new;
           if (message && 
               ((message.sender_id === userId && message.receiver_id === peerId) ||
                (message.sender_id === peerId && message.receiver_id === userId))) {
-            console.log('Relevant message detected, fetching updated messages');
-            try {
-              await fetchMessages(peerId);
-            } catch (err) {
-              console.error('Error fetching messages after real-time update:', err);
-            }
+            // Append to state and localStorage
+            setMessages(prev => {
+              // Prevent duplicates
+              if (prev.some(m => m.id === message.id)) return prev;
+              const chatMessage = {
+                id: message.id,
+                sender: message.sender_id === userId ? 'you' : (message.sender_name || 'Peer'),
+                message: message.message,
+                timestamp: new Date(message.timestamp),
+                isAnonymous: message.is_anonymous,
+                senderId: message.sender_id,
+                receiverId: message.receiver_id
+              };
+              const updated = [...prev, chatMessage];
+              try {
+                localStorage.setItem(getChatStorageKey(userId, peerId), JSON.stringify(updated));
+              } catch (e) { /* ignore quota errors */ }
+              return updated;
+            });
           }
         })
         .on('postgres_changes', { 
@@ -198,6 +214,13 @@ export function usePeerChat(): UsePeerChatReturn {
         timestamp: new Date(msg.timestamp)
       }));
       
+      // Cache in localStorage
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          localStorage.setItem(getChatStorageKey(session.user.id, peerId), JSON.stringify(formattedMessages));
+        }
+      } catch (e) { /* ignore quota errors */ }
       console.log(`Setting ${formattedMessages.length} messages in state`);
       setMessages(formattedMessages);
       
@@ -285,7 +308,16 @@ export function usePeerChat(): UsePeerChatReturn {
         timestamp: new Date(data.chat.timestamp)
       };
       
-      setMessages(prev => [...prev, newMessage]);
+      setMessages(prev => {
+        const updated = [...prev, newMessage];
+        try {
+          const { data: { session } } = supabase.auth.getSession();
+          if (session?.user?.id) {
+            localStorage.setItem(getChatStorageKey(session.user.id, receiverId), JSON.stringify(updated));
+          }
+        } catch (e) { /* ignore quota errors */ }
+        return updated;
+      });
       return newMessage;
     } catch (err) {
       console.error('Error sending message:', err);
@@ -343,6 +375,13 @@ export function usePeerChat(): UsePeerChatReturn {
         console.log('Clearing messages for current peer');
         setMessages([]);
         setSelectedPeer(null);
+        // Remove from localStorage
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id) {
+            localStorage.removeItem(getChatStorageKey(session.user.id, peerId));
+          }
+        } catch (e) { /* ignore quota errors */ }
       }
       
       return true;
@@ -364,19 +403,34 @@ export function usePeerChat(): UsePeerChatReturn {
       cleanupSubscription();
       
       setSelectedPeer(peer);
+      // Try to load from localStorage first
+      const { data: { session } } = await supabase.auth.getSession();
+      let loaded = false;
+      if (session?.user?.id) {
+        const cached = localStorage.getItem(getChatStorageKey(session.user.id, peer.id));
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached).map((msg: any) => ({ ...msg, timestamp: new Date(msg.timestamp) }));
+            setMessages(parsed);
+            loaded = true;
+          } catch (e) { /* ignore parse errors */ }
+        }
+      }
       setMessages(initialMessages);
       
       // Get current user ID for subscription
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) {
+      const { data: { session: userSession } } = await supabase.auth.getSession();
+      if (!userSession?.user?.id) {
         throw new Error('No authenticated user found');
       }
       
       // Set up real-time subscription
-      await setupSubscription(peer.id, session.user.id);
+      await setupSubscription(peer.id, userSession.user.id);
       
-      // Fetch initial messages
-      await fetchMessages(peer.id);
+      // If not loaded from cache, fetch from Supabase
+      if (!loaded) {
+        await fetchMessages(peer.id);
+      }
       
     } catch (err) {
       console.error('Error initializing chat:', err);

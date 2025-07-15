@@ -93,7 +93,12 @@ export default function PeerSupportPage() {
     setIsAnonymous,
     fetchMessages,
     sendMessage,
-    initializeChat
+    initializeChat,
+    deleteChat,
+    subscriptionStatus,
+    refreshSubscription,
+    cleanup,
+    testRealtime
   } = usePeerChat();
 
   const {
@@ -768,8 +773,19 @@ export default function PeerSupportPage() {
       <PeerChat 
         peer={selectedPeer}
         onClose={() => setShowChat(false)}
-        initialMessages={chatMessages}
-        initialIsAnonymous={isAnonymous}
+        messages={messages}
+        isAnonymous={isAnonymous}
+        setIsAnonymous={setIsAnonymous}
+        sendMessage={sendMessage}
+        deleteChat={deleteChat}
+        fetchMessages={fetchMessages}
+        initializeChat={initializeChat}
+        subscriptionStatus={subscriptionStatus}
+        refreshSubscription={refreshSubscription}
+        error={chatError}
+        cleanup={cleanup}
+        testRealtime={testRealtime}
+        isLoading={isChatLoading}
       />
     );
   }
