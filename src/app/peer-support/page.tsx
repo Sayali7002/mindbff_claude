@@ -768,8 +768,6 @@ export default function PeerSupportPage() {
       <PeerChat 
         peer={selectedPeer}
         onClose={() => setShowChat(false)}
-        initialMessages={chatMessages}
-        initialIsAnonymous={isAnonymous}
       />
     );
   }
