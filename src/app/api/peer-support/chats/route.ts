@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
         .or(`and(sender_id.eq.${userId},receiver_id.eq.${peerId}),and(sender_id.eq.${peerId},receiver_id.eq.${userId})`)
         .order('created_at', { ascending: true });
       
+      console.log(`Raw database response:`, { chatMessages, messagesError });
+      
       if (messagesError) {
         console.error('Error fetching chat messages:', messagesError);
         return NextResponse.json(
@@ -206,6 +208,7 @@ export async function POST(request: NextRequest) {
       const encryptedMessage = encryptConversationMessage(message, userId, receiver_id);
       
       // Insert the new encrypted message
+      console.log(`Inserting message from ${userId} to ${receiver_id}:`, { message, is_anonymous });
       const { data, error } = await supabase
         .from('peer_support_chats')
         .insert({
@@ -216,6 +219,8 @@ export async function POST(request: NextRequest) {
           is_read: false
         })
         .select();
+      
+      console.log(`Insert result:`, { data, error });
       
       if (error) {
         console.error('Error sending message:', error);

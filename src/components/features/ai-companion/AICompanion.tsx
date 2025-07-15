@@ -85,7 +85,7 @@ export default function AICompanion() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "Hey! I'm your MindBFF companion. How are you feeling today?",
+      content: "Hey! Nice to meet you! I'm here to listen and support you. How are you feeling today?",
       timestamp: new Date().toISOString()
     }
   ])

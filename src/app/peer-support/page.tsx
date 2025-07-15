@@ -18,6 +18,7 @@ import { SentRequests } from './components/SentRequests';
 import Link from 'next/link';
 import { Notification } from './components/Notification';
 import AICompanion from '@/components/features/ai-companion/AICompanion';
+import { getChatUrl } from '@/lib/peer-support/utils';
 import EnhancedAffirmations from '@/components/features/mindfulness/EnhancedAffirmations';
 import EnhancedFocusTimer from '@/components/features/mindfulness/EnhancedFocusTimer';
 import EnhancedGratitudeJournal from '@/components/features/mindfulness/EnhancedGratitudeJournal';
@@ -198,9 +199,17 @@ export default function PeerSupportPage() {
   // Handle opening chat with a connected peer
   const handleOpenChat = (peer: PeerMatch) => {
     console.log("Opening chat with peer:", peer.name, peer.id);
+    
+    // Navigate to dedicated chat page
+    if (user?.id) {
+      const chatUrl = getChatUrl(user.id, peer.id);
+      router.push(chatUrl);
+    } else {
+      // Fallback to modal if no user ID
     setSelectedPeer(peer);
     setShowChat(true);
     setChatMessages([]);
+    }
   };
 
   // Handle cancelling a sent request
@@ -347,7 +356,9 @@ export default function PeerSupportPage() {
     'Career Growth',
     'Sunday Anxiety',
     'Meeting Anxiety',
-    'Loneliness'
+    'Loneliness',
+    'Career Break',
+    'Founder struggles'
   ];
 
   // Helper function to calculate profile completion percentage
@@ -925,9 +936,14 @@ export default function PeerSupportPage() {
                   className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:border-blue-200 cursor-pointer"
                   onClick={() => {
                     console.log("Selected chat with peer:", peer.name, peer.id);
+                    if (user?.id) {
+                      const chatUrl = getChatUrl(user.id, peer.id);
+                      router.push(chatUrl);
+                    } else {
                     setSelectedPeer(peer);
                     setShowChat(true);
                     setShowMyChatsList(false);
+                    }
                   }}
                 >
                   <div className="flex items-center space-x-3">
@@ -1225,14 +1241,14 @@ export default function PeerSupportPage() {
                             <span className="font-semibold">Strengths Tracker</span>
                             <span className="text-xs text-gray-500 mt-1">Track and celebrate your strengths</span>
                           </button>
-                          <a
+                           {/* <a
                             href="/resources"
                             className="bg-gray-50 hover:bg-gray-100 rounded-lg p-4 flex flex-col items-center shadow transition"
                           >
                             <span className="material-icons text-4xl text-gray-500 mb-2">support_agent</span>
                             <span className="font-semibold">Helpline & Resources</span>
                             <span className="text-xs text-gray-500 mt-1">Find professional help and hotlines</span>
-                          </a>
+                          </a>  */}
                           </div>
             </div>
           )}

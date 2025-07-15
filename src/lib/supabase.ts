@@ -137,6 +137,7 @@ export interface Database {
           receiver_id: string
           message: string
           is_anonymous: boolean
+          is_read: boolean
         }
         Insert: {
           id?: string
@@ -145,6 +146,7 @@ export interface Database {
           receiver_id: string
           message: string
           is_anonymous?: boolean
+          is_read?: boolean
         }
         Update: {
           id?: string
@@ -153,6 +155,7 @@ export interface Database {
           receiver_id?: string
           message?: string
           is_anonymous?: boolean
+          is_read?: boolean
         }
       }
       support_requests: {
@@ -212,6 +215,11 @@ export const supabase = createClient<Database>(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
     }
   }
 );

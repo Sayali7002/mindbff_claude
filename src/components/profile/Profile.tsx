@@ -17,7 +17,9 @@ const journeyOptions = [
   'Career Growth',
   'Sunday Anxiety',
   'Meeting Anxiety',
-  'Loneliness'
+  'Loneliness',
+  'Career Break',
+  'Founder struggles'
 ];
 
 export default function Profile() {

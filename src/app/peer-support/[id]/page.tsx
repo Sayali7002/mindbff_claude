@@ -11,6 +11,7 @@ import { usePeerChat } from '@/hooks/peer-support/usePeerChat';
 import { ConnectionModal } from '../components/ConnectionModal';
 import { useSupportRequests } from '@/hooks/peer-support/useSupportRequests';
 import { Notification } from '../components/Notification';
+import { getChatUrl } from '@/lib/peer-support/utils';
 
 export default function PeerDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -185,19 +186,7 @@ export default function PeerDetailPage({ params }: { params: { id: string } }) {
 
   // Handle opening chat with a connected peer
   const handleOpenChat = () => {
-    if (!peer) return;
-    
-    // Get the user's support type
-    const supportType = userProfile?.supportType;
-    
-    // Prepare initial messages based on user type
-    const initialMessages = [{
-      id: 'system-welcome',
-      sender: 'system',
-      message: `You are now connected with ${peer.name}. This conversation is private and secure.`,
-      timestamp: new Date(),
-      isAnonymous: false
-    }];
+    if (!peer || !user) return;
     
     // Add to my chats list if not already there
     const myChatsData = localStorage.getItem('myChats') || '[]';
@@ -207,12 +196,9 @@ export default function PeerDetailPage({ params }: { params: { id: string } }) {
       localStorage.setItem('myChats', JSON.stringify(updatedChatsList));
     }
     
-    // Initialize the chat with this peer
-    setSelectedPeer(peer);
-    initializeChat(peer, initialMessages);
-    
-    // Redirect to peer support page with chat open
-    router.push('/peer-support?chat=open');
+    // Navigate to the chat URL using the utility function
+    const chatUrl = getChatUrl(user.id, peer.id);
+    router.push(chatUrl);
   };
 
   // Find shared journeys between the user and the peer

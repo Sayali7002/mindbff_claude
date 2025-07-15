@@ -18,74 +18,150 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
     setIsAnonymous,
     sendMessage: sendMessageToApi,
     deleteChat,
-    fetchMessages
+    fetchMessages,
+    initializeChat,
+    subscriptionStatus,
+    refreshSubscription,
+    error: chatError,
+    cleanup,
+    testRealtime
   } = usePeerChat();
   
   const [chatMessage, setChatMessage] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(initialMessages);
+  const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [showNewMessageNotification, setShowNewMessageNotification] = useState(false);
+  const [userScrolledUp, setUserScrolledUp] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const initializedPeerRef = useRef<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Initialize audio for notifications
+  useEffect(() => {
+    audioRef.current = new Audio('/notification.mp3');
+  }, []);
 
   // Fetch messages when component mounts
   useEffect(() => {
     console.log("PeerChat opened with peer:", peer);
     
-    if (peer && peer.id) {
-      console.log("Fetching messages for peer:", peer.id);
-      fetchMessages(peer.id)
-        .then(msgs => {
-          console.log("Fetched messages:", msgs);
-          if (msgs && msgs.length > 0) {
-            setChatMessages(msgs);
-          }
+    if (peer && peer.id && initializedPeerRef.current !== peer.id) {
+      console.log("Initializing chat for peer:", peer.id);
+      initializedPeerRef.current = peer.id;
+      
+      // Initialize the chat with real-time subscription
+      initializeChat(peer, initialMessages)
+        .then(() => {
+          console.log("Chat initialized successfully");
         })
-        .catch(err => {
-          console.error("Error fetching messages:", err);
+        .catch((err: any) => {
+          console.error("Error initializing chat:", err);
         });
     }
-  }, [peer, fetchMessages]);
+  }, [peer?.id, initialMessages, initializeChat]);
 
   // Set initial anonymous mode
   useEffect(() => {
     setIsAnonymous(initialIsAnonymous);
   }, [initialIsAnonymous, setIsAnonymous]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      initializedPeerRef.current = null;
+      cleanup();
+    };
+  }, [cleanup]);
+
   // Update messages when they change from the hook
   useEffect(() => {
     if (messages.length > 0) {
+      const previousMessageCount = chatMessages.length;
       setChatMessages(messages);
+      
+      // Show notification for new messages if user is scrolled up
+      if (messages.length > previousMessageCount && userScrolledUp) {
+        setShowNewMessageNotification(true);
+        // Play notification sound
+        if (audioRef.current) {
+          audioRef.current.play().catch(console.error);
+        }
+      }
     }
-  }, [messages]);
+  }, [messages, userScrolledUp]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+    if (!userScrolledUp) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, userScrolledUp]);
+
+  // Handle scroll position detection
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setUserScrolledUp(!isNearBottom);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleSendMessage = async () => {
-    if (!chatMessage.trim() || !peer) return;
+    if (!chatMessage.trim() || !peer || isSending) return;
     
-    // Add user message to UI immediately
-    const userMessage: ChatMessage = {
+    const messageText = chatMessage.trim();
+    setChatMessage('');
+    setIsSending(true);
+    
+    // Add optimistic message
+    const optimisticMessage: ChatMessage = {
       id: `temp-${Date.now()}`,
       sender: 'you',
-      message: chatMessage,
+      message: messageText,
       timestamp: new Date(),
       isAnonymous
     };
     
-    setChatMessages(prev => [...prev, userMessage]);
-    setChatMessage('');
-    
-    // Save to localStorage for persistence
-    localStorage.setItem('chatMessages', JSON.stringify([...chatMessages, userMessage]));
+    setOptimisticMessages(prev => [...prev, optimisticMessage]);
     
     try {
       // Send to API
-      await sendMessageToApi(peer.id, chatMessage);
+      const sentMessage = await sendMessageToApi(peer.id, messageText);
+      
+      if (sentMessage) {
+        // Remove optimistic message and let real-time update handle it
+        setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+      } else {
+        // If sending failed, keep optimistic message but mark as failed
+        setOptimisticMessages(prev => 
+          prev.map(msg => 
+            msg.id === optimisticMessage.id 
+              ? { ...msg, message: msg.message + ' (Failed to send)' }
+              : msg
+          )
+        );
+      }
     } catch (error) {
       console.error('Error sending message:', error);
-      // Could add error handling UI here
+      // Mark optimistic message as failed
+      setOptimisticMessages(prev => 
+        prev.map(msg => 
+          msg.id === optimisticMessage.id 
+            ? { ...msg, message: msg.message + ' (Failed to send)' }
+            : msg
+        )
+      );
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -132,12 +208,48 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
     }
   };
 
+  const handleScrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowNewMessageNotification(false);
+  };
+
+  const handleRefreshSubscription = async () => {
+    try {
+      await refreshSubscription();
+    } catch (error) {
+      console.error('Error refreshing subscription:', error);
+    }
+  };
+
+  // Combine real messages with optimistic messages
+  const allMessages = [...chatMessages, ...optimisticMessages];
+
+  // Get connection status color and text
+  const getConnectionStatus = () => {
+    switch (subscriptionStatus) {
+      case 'SUBSCRIBED':
+        return { color: 'bg-green-500', text: 'Connected' };
+      case 'CONNECTING':
+        return { color: 'bg-yellow-500', text: 'Connecting...' };
+      case 'RETRYING':
+        return { color: 'bg-orange-500', text: 'Reconnecting...' };
+      case 'CHANNEL_ERROR':
+        return { color: 'bg-red-500', text: 'Connection Error' };
+      case 'CLOSED':
+        return { color: 'bg-gray-400', text: 'Disconnected' };
+      default:
+        return { color: 'bg-gray-400', text: 'Unknown' };
+    }
+  };
+
+  const connectionStatus = getConnectionStatus();
+
   return (
-    <div className="min-h-screen gradient-bg p-6">
-      <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-3rem)]">
-        {/* Header section */}
-        <div className="mb-4">
-          {/* First line: Back button, Name, End Chat button */}
+    <div className="h-screen gradient-bg p-6 overflow-hidden">
+    <div className="max-w-2xl mx-auto flex flex-col h-full">
+      {/* Header section - fixed height */}
+      <div className="flex-shrink-0 mb-4">
+                  {/* First line: Back button, Name, End Chat button */}
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center">
               <button 
@@ -154,9 +266,48 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
                   )}
                 </div>
                 <h2 className="font-semibold text-gray-900">{peer.name}</h2>
+                {/* Real-time connection indicator */}
+                 <div className="ml-2 flex items-center">
+                  {/* <div className={`w-2 h-2 rounded-full mr-1 ${connectionStatus.color}`}></div>
+                  <span className="text-xs text-gray-500">
+                    {connectionStatus.text}
+                  </span> */}
+                </div>
               </div>
             </div>
             <div className="flex items-center space-x-2">
+             {/* <Button
+                onClick={() => {
+                  console.log('Manual refresh triggered');
+                  fetchMessages(peer.id);
+                }}
+                variant="outline"
+                size="sm"
+                className="text-blue-500 hover:bg-blue-50 border-blue-200"
+                disabled={isLoading}
+              >
+                <span className="material-icons mr-1 text-sm">refresh</span>
+                Refresh
+              </Button>
+              <Button
+                onClick={handleRefreshSubscription}
+                variant="outline"
+                size="sm"
+                className="text-green-500 hover:bg-green-50 border-green-200"
+                disabled={subscriptionStatus === 'SUBSCRIBED' || subscriptionStatus === 'CONNECTING'}
+              >
+                <span className="material-icons mr-1 text-sm">wifi</span>
+                Reconnect
+              </Button>
+              <Button
+                onClick={testRealtime}
+                variant="outline"
+                size="sm"
+                className="text-purple-500 hover:bg-purple-50 border-purple-200"
+              >
+                <span className="material-icons mr-1 text-sm">bug_report</span>
+                Test RT
+              </Button>   */}
               <Button
                 onClick={() => setShowDeleteConfirm(true)}
                 variant="outline"
@@ -164,7 +315,6 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
                 className="text-red-500 hover:bg-red-50 border-red-200"
               >
                 <span className="material-icons mr-1 text-sm">delete</span>
-                Delete Chat
               </Button>
               <Button
                 onClick={onClose}
@@ -178,11 +328,6 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
           
           {/* Second line: Ratings and Anonymous toggle */}
           <div className="flex justify-between items-center ml-10 pl-2">
-             {/*<span className="text-sm text-gray-600 flex items-center">
-            } <span className="material-icons text-yellow-500 text-sm mr-1">star</span>
-              {peer.rating} ({peer.totalRatings})
-            </span> */}
-            
             <div className="flex items-center">
               <label className="text-sm text-gray-600 mr-2">Anonymous:</label>
               <div 
@@ -200,6 +345,12 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
             </div>
           </div>
         </div>
+        
+        {/* Error display */}
+        {chatError && (
+  <div className="flex-shrink-0 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">            <p className="text-red-700 text-sm">{chatError}</p>
+          </div>
+        )}
         
         {/* Delete confirmation modal */}
         {showDeleteConfirm && (
@@ -244,11 +395,11 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
           </div>
         )}
         
-        {/* Chat messages */}
-        <div className="flex-1 bg-white rounded-lg shadow-sm p-4 overflow-y-auto mb-4">
-          {chatMessages.map((msg, index) => (
+ {/* Chat messages - scrollable area */}
+ <div className="flex-1 bg-white rounded-lg shadow-sm p-4 overflow-y-auto mb-4 relative min-h-0" ref={messagesContainerRef}>
+    {allMessages.map((msg, index) => (
             <div 
-              key={index} 
+              key={msg.id || index} 
               className={`mb-4 ${msg.sender === 'you' ? 'text-right' : ''} ${msg.sender === 'system' ? 'text-center' : ''}`}
             >
               {msg.sender !== 'system' && (
@@ -263,7 +414,9 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
                     ? 'bg-blue-500 text-white' 
                     : msg.sender === 'system'
                       ? 'bg-gray-200 text-gray-700 text-sm text-center'
-                      : 'bg-gray-100 text-gray-800'
+                      : msg.message.includes('(Failed to send)')
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-gray-100 text-gray-800'
                 }`}
               >
                 {msg.message}
@@ -274,10 +427,24 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
             </div>
           ))}
           <div ref={messagesEndRef} />
+          
+          {/* New message notification */}
+          {showNewMessageNotification && (
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+              <Button
+                onClick={handleScrollToBottom}
+                size="sm"
+                className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg"
+              >
+                <span className="material-icons mr-1 text-sm">keyboard_arrow_down</span>
+                New Messages
+              </Button>
+            </div>
+          )}
         </div>
         
-        {/* Message input */}
-        <div className="flex items-center bg-white rounded-lg shadow-sm p-2">
+         {/* Message input - fixed at bottom */}
+         <div className="flex-shrink-0 flex items-center bg-white rounded-lg shadow-sm p-2">
           <input
             type="text"
             value={chatMessage}
@@ -285,15 +452,20 @@ export function PeerChat({ peer, onClose, initialMessages = [], initialIsAnonymo
             placeholder={isAnonymous ? "Type anonymously..." : "Type your message..."}
             className="flex-1 p-2 border-none focus:outline-none focus:ring-0"
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+            disabled={isSending || subscriptionStatus === 'CHANNEL_ERROR'}
           />
           <button
             onClick={handleSendMessage}
-            disabled={!chatMessage.trim() || isLoading}
+            disabled={!chatMessage.trim() || isSending || subscriptionStatus === 'CHANNEL_ERROR'}
             className={`p-2 rounded-full ${
-              !chatMessage.trim() || isLoading ? 'text-gray-400' : 'text-blue-500 hover:text-blue-600'
+              !chatMessage.trim() || isSending || subscriptionStatus === 'CHANNEL_ERROR' 
+                ? 'text-gray-400' 
+                : 'text-blue-500 hover:text-blue-600'
             }`}
           >
-            <span className="material-icons">{isLoading ? 'hourglass_empty' : 'send'}</span>
+            <span className="material-icons">
+              {isSending ? 'hourglass_empty' : 'send'}
+            </span>
           </button>
         </div>
       </div>

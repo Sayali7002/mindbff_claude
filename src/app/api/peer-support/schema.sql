@@ -81,4 +81,7 @@ CREATE INDEX IF NOT EXISTS support_requests_status_idx ON support_requests(statu
 
 CREATE INDEX IF NOT EXISTS peer_support_chats_sender_id_idx ON peer_support_chats(sender_id);
 CREATE INDEX IF NOT EXISTS peer_support_chats_receiver_id_idx ON peer_support_chats(receiver_id);
-CREATE INDEX IF NOT EXISTS peer_support_chats_conversation_idx ON peer_support_chats(sender_id, receiver_id); 
+CREATE INDEX IF NOT EXISTS peer_support_chats_conversation_idx ON peer_support_chats(sender_id, receiver_id);
+
+-- Enable realtime for peer_support_chats table
+ALTER PUBLICATION supabase_realtime ADD TABLE peer_support_chats; 

@@ -19,6 +19,7 @@ export function useAuth(): AuthState & {
   // Add refs to track operations
   const profileFetchedRef = useRef(false);
   const profileOperationInProgressRef = useRef(false);
+  const lastFetchedUserIdRef = useRef<string | null>(null);
 
   // Function to sync localStorage data with Supabase
   const syncProfileWithSupabase = async (userId: string) => {
@@ -271,70 +272,72 @@ export function useAuth(): AuthState & {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user || null);
-        
+
+        // Only fetch/sync profile if not already fetched for this user
         if (session?.user) {
-          console.log("Auth: User authenticated", session.user.id);
-          
-          // Check if there's any localStorage data that needs to be synced with the database
-          const hasLocalStorageData = localStorage.getItem('userProfile') || 
-                                     localStorage.getItem('supportType') || 
-                                     localStorage.getItem('selectedJourneys') ||
-                                     localStorage.getItem('journeyNote');
-          
-          if (hasLocalStorageData) {
-            // Sync localStorage data with database
-            await syncProfileWithSupabase(session.user.id);
-          } else if (!profileFetchedRef.current) {
-            // If no localStorage data and profile not fetched, fetch profile from Supabase
-            await fetchAndUpdateUserProfile(session.user.id);
+          if (lastFetchedUserIdRef.current !== session.user.id) {
+            // Check localStorage for cached profile
+            const cachedProfile = localStorage.getItem('userProfile');
+            if (cachedProfile) {
+              const parsedProfile = JSON.parse(cachedProfile);
+              if (parsedProfile.id === session.user.id) {
+                setUser(parsedProfile);
+                lastFetchedUserIdRef.current = session.user.id;
+              } else {
+                // Different user, fetch and update
+                await fetchAndUpdateUserProfile(session.user.id);
+                lastFetchedUserIdRef.current = session.user.id;
+              }
+            } else {
+              // No cached profile, fetch and update
+              await fetchAndUpdateUserProfile(session.user.id);
+              lastFetchedUserIdRef.current = session.user.id;
+            }
           }
         } else {
-          console.log("Auth: No authenticated user");
+          setUser(null);
+          lastFetchedUserIdRef.current = null;
         }
       } catch (error) {
         console.error("Error getting auth session:", error);
       } finally {
         setLoading(false);
       }
-      
+
       // Set up auth state listener
       const { data: { subscription } } = await supabase.auth.onAuthStateChange(
         async (_event, session) => {
-          console.log("Auth state changed:", _event);
           setSession(session);
           setUser(session?.user || null);
-          
-          // Only perform profile operations on sign in or token refresh
-          if ((_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED') && session?.user) {
-            // Reset profile fetched flag on sign in
-            if (_event === 'SIGNED_IN') {
-              profileFetchedRef.current = false;
+          if (session?.user) {
+            if (lastFetchedUserIdRef.current !== session.user.id) {
+              // Check localStorage for cached profile
+              const cachedProfile = localStorage.getItem('userProfile');
+              if (cachedProfile) {
+                const parsedProfile = JSON.parse(cachedProfile);
+                if (parsedProfile.id === session.user.id) {
+                  setUser(parsedProfile);
+                  lastFetchedUserIdRef.current = session.user.id;
+                } else {
+                  await fetchAndUpdateUserProfile(session.user.id);
+                  lastFetchedUserIdRef.current = session.user.id;
+                }
+              } else {
+                await fetchAndUpdateUserProfile(session.user.id);
+                lastFetchedUserIdRef.current = session.user.id;
+              }
             }
-            
-            // Check if there's any localStorage data that needs to be synced with the database
-            const hasLocalStorageData = localStorage.getItem('userProfile') || 
-                                       localStorage.getItem('supportType') || 
-                                       localStorage.getItem('selectedJourneys') ||
-                                       localStorage.getItem('journeyNote');
-            
-            if (hasLocalStorageData) {
-              // Sync localStorage data with database
-              await syncProfileWithSupabase(session.user.id);
-            } else if (!profileFetchedRef.current) {
-              // If no localStorage data and profile not fetched, fetch profile from Supabase
-              await fetchAndUpdateUserProfile(session.user.id);
-            }
+          } else {
+            setUser(null);
+            lastFetchedUserIdRef.current = null;
           }
-          
           setLoading(false);
         }
       );
-      
       return () => {
         subscription.unsubscribe();
       };
     };
-    
     getSession();
   }, []);
 

@@ -116,7 +116,9 @@ const journeyOptions = [
   'Career Growth',
   'Sunday Anxiety',
   'Meeting Anxiety',
-  'Loneliness'
+  'Loneliness',
+  'Career Break',
+  'Founder struggles'
 ];
 
 // Add additional steps for journey and support preferences
