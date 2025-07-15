@@ -32,7 +32,8 @@ export default function ChatPage() {
     cleanup,
     subscriptionStatus,
     refreshSubscription,
-    testRealtime
+    testRealtime,
+    deleteChat
   } = usePeerChat();
 
   // Validate chat ID format
@@ -181,7 +182,7 @@ export default function ChatPage() {
       isAnonymous={isAnonymous}
       setIsAnonymous={setIsAnonymous}
       sendMessage={sendMessage}
-      deleteChat={() => {}} // Placeholder for deleteChat
+      deleteChat={deleteChat}
       fetchMessages={fetchMessages}
       initializeChat={initializeChat}
       subscriptionStatus={subscriptionStatus}
