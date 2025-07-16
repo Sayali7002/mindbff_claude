@@ -34,7 +34,7 @@ function AILabel() {
   return <span className="ml-1 inline-block align-middle" title="AI suggestion">🤖</span>;
 }
 
-function EmotionSelector({ emotions, setEmotions, intensities, setIntensities }: any) {
+function EmotionSelector({ emotions, setEmotions, intensities, setIntensities, aiSuggestions }: any) {
   return (
     <div>
       <div className="flex flex-wrap gap-2 mb-2">
@@ -54,6 +54,23 @@ function EmotionSelector({ emotions, setEmotions, intensities, setIntensities }:
             {e}
           </button>
         ))}
+        {/* AI emotion suggestions as chips */}
+        {aiSuggestions && aiSuggestions.length > 0 && (
+          <>
+            {aiSuggestions.map((s: string, idx: number) => (
+              <button
+                key={s + idx}
+                type="button"
+                className="px-2 py-1 rounded border border-blue-400 bg-blue-50 text-blue-700"
+                onClick={() => {
+                  if (!emotions.includes(s)) setEmotions([...emotions, s]);
+                }}
+              >
+                {s} <AILabel />
+              </button>
+            ))}
+          </>
+        )}
       </div>
       {emotions.map((e: string) => (
         <div key={e} className="flex items-center gap-2 mb-1">
@@ -73,7 +90,7 @@ function EmotionSelector({ emotions, setEmotions, intensities, setIntensities }:
   );
 }
 
-function DistortionSelector({ distortions, setDistortions }: any) {
+function DistortionSelector({ distortions, setDistortions, aiSuggestions }: any) {
   return (
     <div>
       <div className="flex flex-wrap gap-2">
@@ -93,6 +110,23 @@ function DistortionSelector({ distortions, setDistortions }: any) {
             {d}
           </label>
         ))}
+        {/* AI distortion suggestions as chips */}
+        {aiSuggestions && aiSuggestions.length > 0 && (
+          <>
+            {aiSuggestions.map((s: string, idx: number) => (
+              <button
+                key={s + idx}
+                type="button"
+                className="px-2 py-1 rounded border border-blue-400 bg-blue-50 text-blue-700"
+                onClick={() => {
+                  if (!distortions.includes(s)) setDistortions([...distortions, s]);
+                }}
+              >
+                {s} <AILabel />
+              </button>
+            ))}
+          </>
+        )}
       </div>
     </div>
   );
@@ -310,10 +344,11 @@ export default function CBTThoughtTracker() {
             setEmotions={field.key === 'emotions' ? setEmotions : setReevalEmotions}
             intensities={field.key === 'emotions' ? emotionIntensities : reevalIntensities}
             setIntensities={field.key === 'emotions' ? setEmotionIntensities : setReevalIntensities}
+            aiSuggestions={aiSuggestions}
           />
         )}
         {field.type === 'distortions' && (
-          <DistortionSelector distortions={distortions} setDistortions={setDistortions} />
+          <DistortionSelector distortions={distortions} setDistortions={setDistortions} aiSuggestions={aiSuggestions} />
         )}
         {field.type === 'slider' && (
           <div className="flex items-center gap-2">
@@ -328,43 +363,45 @@ export default function CBTThoughtTracker() {
             <span>{likelihood}%</span>
           </div>
         )}
-        {/* AI Suggestions */}
-        <div>
-          {aiLoading && <div className="text-center text-gray-500">Loading AI suggestions...</div>}
-          {aiError && <div className="text-center text-red-600">{aiError}</div>}
-          {aiSuggestions.length > 0 && (
-            <div className="bg-blue-50 p-3 rounded-lg mt-2">
-              <div className="text-sm text-gray-700 flex items-center mb-1"><AILabel /> Suggestions:</div>
-              <ul className="list-disc list-inside space-y-1">
-                {aiSuggestions.map((s, idx) => (
-                  <li key={idx} className="flex items-center gap-2">
-                    <span>{s}</span>
-                    <button
-                      type="button"
-                      className="ml-2 px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs"
-                      onClick={() => {
-                        switch (field.key) {
-                          case 'situation': setSituation(s); break;
-                          case 'ants': setAnts(s); break;
-                          case 'behaviors': setBehaviors(s); break;
-                          case 'evidenceFor': setEvidenceFor(s); break;
-                          case 'evidenceAgainst': setEvidenceAgainst(s); break;
-                          case 'alternative': setAlternative(s); break;
-                          case 'friendsAdvice': setFriendsAdvice(s); break;
-                          case 'coping': setCoping(s); break;
-                          case 'balancedThought': setBalancedThought(s); break;
-                          default: break;
-                        }
-                      }}
-                    >
-                      Use
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        {/* AI Suggestions for textarea/slider fields */}
+        {['textarea', 'slider'].includes(field.type) && (
+          <div>
+            {aiLoading && <div className="text-center text-gray-500">Loading AI suggestions...</div>}
+            {aiError && <div className="text-center text-red-600">{aiError}</div>}
+            {aiSuggestions.length > 0 && (
+              <div className="bg-blue-50 p-3 rounded-lg mt-2">
+                <div className="text-sm text-gray-700 flex items-center mb-1"><AILabel /> Suggestions:</div>
+                <ul className="list-disc list-inside space-y-1">
+                  {aiSuggestions.map((s, idx) => (
+                    <li key={idx} className="flex items-center gap-2">
+                      <span>{s}</span>
+                      <button
+                        type="button"
+                        className="ml-2 px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs"
+                        onClick={() => {
+                          switch (field.key) {
+                            case 'situation': setSituation(s); break;
+                            case 'ants': setAnts(s); break;
+                            case 'behaviors': setBehaviors(s); break;
+                            case 'evidenceFor': setEvidenceFor(s); break;
+                            case 'evidenceAgainst': setEvidenceAgainst(s); break;
+                            case 'alternative': setAlternative(s); break;
+                            case 'friendsAdvice': setFriendsAdvice(s); break;
+                            case 'coping': setCoping(s); break;
+                            case 'balancedThought': setBalancedThought(s); break;
+                            default: break;
+                          }
+                        }}
+                      >
+                        Use
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   } else {
