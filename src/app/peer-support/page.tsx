@@ -1108,6 +1108,7 @@ export default function PeerSupportPage() {
             onDecline={handleDeclineRequest}
                 onClose={() => setShowRequests(false)}
             activeView={activeView}
+            userId={user?.id} // <-- Pass userId prop here
           />
             ) : (
               <SentRequests
