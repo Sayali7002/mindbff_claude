@@ -85,6 +85,10 @@ function DistortionSelector({ distortions, setDistortions }: any) {
   );
 }
 
+function AILabel() {
+  return <span className="ml-1 inline-block align-middle" title="AI suggestion">🤖</span>;
+}
+
 export default function CBTThoughtTracker() {
   const [step, setStep] = useState(0);
   // Step 1
@@ -112,10 +116,96 @@ export default function CBTThoughtTracker() {
   const [error, setError] = useState<string|null>(null);
   const [success, setSuccess] = useState<string|null>(null);
 
+  // AI state
+  const [aiDistortionLoading, setAIDistortionLoading] = useState(false);
+  const [aiChallengePrompts, setAIChallengePrompts] = useState<string[]>([]);
+  const [aiChallengeLoading, setAIChallengeLoading] = useState(false);
+  const [aiBalancedSuggestions, setAIBalancedSuggestions] = useState<string[]>([]);
+  const [aiBalancedLoading, setAIBalancedLoading] = useState(false);
+  const [aiError, setAIError] = useState<string|null>(null);
+
   // Fetch history on mount
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  // Step 2: Suggest distortions after ANTs entered
+  useEffect(() => {
+    if (step === 1 && ants.trim()) {
+      setAIDistortionLoading(true);
+      setAIError(null);
+      fetch('/api/cbt-gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'distortion_suggestion', ants }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.response) {
+            // Parse comma-separated list
+            const suggestions = data.response.split(',').map((d: string) => d.trim()).filter(Boolean);
+            setDistortions(suggestions);
+          } else if (data.error) {
+            setAIError(data.error);
+          }
+        })
+        .catch(err => setAIError('AI error: ' + err.message))
+        .finally(() => setAIDistortionLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, ants]);
+
+  // Step 3: Challenge prompts
+  useEffect(() => {
+    if (step === 2 && ants.trim() && distortions.length > 0) {
+      setAIChallengeLoading(true);
+      setAIError(null);
+      fetch('/api/cbt-gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'challenge_prompt', ants, distortions: distortions.join(', ') }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.response) {
+            // Split into lines or numbered list
+            const prompts = data.response.split(/\n|\d+\. /).map((p: string) => p.trim()).filter(Boolean);
+            setAIChallengePrompts(prompts);
+          } else if (data.error) {
+            setAIError(data.error);
+          }
+        })
+        .catch(err => setAIError('AI error: ' + err.message))
+        .finally(() => setAIChallengeLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, ants, distortions]);
+
+  // Step 4: Balanced thought suggestions
+  useEffect(() => {
+    if (step === 3 && ants.trim() && distortions.length > 0 && evidenceAgainst.trim()) {
+      setAIBalancedLoading(true);
+      setAIError(null);
+      fetch('/api/cbt-gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'balanced_thought', ants, distortions: distortions.join(', '), evidenceAgainst }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.response) {
+            // Split numbered list
+            const suggestions = data.response.split(/\n|\d+\. /).map((s: string) => s.trim()).filter(Boolean);
+            setAIBalancedSuggestions(suggestions);
+          } else if (data.error) {
+            setAIError(data.error);
+          }
+        })
+        .catch(err => setAIError('AI error: ' + err.message))
+        .finally(() => setAIBalancedLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, ants, distortions, evidenceAgainst]);
 
   async function fetchHistory() {
     setLoading(true);
@@ -211,6 +301,8 @@ export default function CBTThoughtTracker() {
     stepContent = (
       <div className="space-y-4">
         <DistortionSelector distortions={distortions} setDistortions={setDistortions} />
+        {aiDistortionLoading && <div className="text-center text-gray-500">Loading AI suggestions...</div>}
+        {aiError && <div className="text-center text-red-600">{aiError}</div>}
       </div>
     );
   } else if (step === 2) {
@@ -241,6 +333,27 @@ export default function CBTThoughtTracker() {
           <label className="block font-semibold mb-1">Coping Strategy</label>
           <textarea className="w-full border rounded p-2" rows={2} value={coping} onChange={e => setCoping(e.target.value)} />
         </div>
+        {aiChallengeLoading && <div className="text-center text-gray-500">Loading AI challenge prompts...</div>}
+        {aiError && <div className="text-center text-red-600">{aiError}</div>}
+        {aiChallengePrompts.length > 0 && (
+          <div className="bg-blue-50 p-3 rounded-lg">
+            <h4 className="font-semibold mb-2">AI Challenge Prompts</h4>
+            <ul className="list-disc list-inside space-y-1">
+              {aiChallengePrompts.map((prompt, idx) => (
+                <li key={idx}>
+                  <span>{prompt}</span>
+                  <button
+                    type="button"
+                    className="ml-2 px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs"
+                    onClick={() => setAlternative(prompt)}
+                  >
+                    Use
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     );
   } else if (step === 3) {
@@ -251,6 +364,27 @@ export default function CBTThoughtTracker() {
           <textarea className="w-full border rounded p-2" rows={2} value={balancedThought} onChange={e => setBalancedThought(e.target.value)} />
         </div>
         <EmotionSelector emotions={reevalEmotions} setEmotions={setReevalEmotions} intensities={reevalIntensities} setIntensities={setReevalIntensities} />
+        {aiBalancedLoading && <div className="text-center text-gray-500">Loading AI balanced thought suggestions...</div>}
+        {aiError && <div className="text-center text-red-600">{aiError}</div>}
+        {aiBalancedSuggestions.length > 0 && (
+          <div className="bg-green-50 p-3 rounded-lg">
+            <h4 className="font-semibold mb-2">AI Balanced Thought Suggestions</h4>
+            <ul className="list-disc list-inside space-y-1">
+              {aiBalancedSuggestions.map((suggestion, idx) => (
+                <li key={idx}>
+                  <span>{suggestion}</span>
+                  <button
+                    type="button"
+                    className="ml-2 px-2 py-1 bg-green-200 text-green-800 rounded text-xs"
+                    onClick={() => setBalancedThought(suggestion)}
+                  >
+                    Use
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     );
   } else if (step === 4) {
