@@ -9,6 +9,7 @@ import {
   decryptConversationMessage, 
   isEncrypted 
 } from '@/lib/encryption';
+import { sendResendEmail } from '@/lib/email'; // Add this import at the top
 
 // Get all chat messages between current user and a specific peer
 export async function GET(request: NextRequest) {
@@ -236,6 +237,26 @@ export async function POST(request: NextRequest) {
           { error: 'Failed to send message - no data returned' },
           { status: 500 }
         );
+      }
+
+      // Check if this is the first message in the chat
+      const { data: messages, error: countError } = await supabase
+        .from('peer_support_chats')
+        .select('id', { count: 'exact', head: true })
+        .eq('sender_id', userId)
+        .eq('receiver_id', receiver_id);
+      if (messages && messages.length === 1) {
+        // Fetch receiver's email
+        const { data: receiverProfile } = await supabase
+          .from('profiles')
+          .select('email, name')
+          .eq('id', receiver_id)
+          .single();
+        if (receiverProfile && receiverProfile.email) {
+          const subject = 'New Message Received';
+          const body = `You have received a new message from ${userId}. Log in to view and respond.`;
+          await sendResendEmail(receiverProfile.email, subject, body);
+        }
       }
       
       // Format the chat message for response (with decrypted message for sender)
