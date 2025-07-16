@@ -42,7 +42,7 @@ function EmotionSelector({ emotions, setEmotions, intensities, setIntensities }:
           </button>
         ))}
       </div>
-      {emotions.map(e => (
+      {emotions.map((e: string) => (
         <div key={e} className="flex items-center gap-2 mb-1">
           <span className="w-24">{e}</span>
           <input
