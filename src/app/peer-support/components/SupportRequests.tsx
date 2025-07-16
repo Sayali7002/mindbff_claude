@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { SupportRequest } from '@/types/peer-support';
+import { createClient } from '@supabase/supabase-js';
+import { Notification } from './Notification';
 
 interface SupportRequestsProps {
   supportRequests: SupportRequest[];
@@ -9,6 +11,7 @@ interface SupportRequestsProps {
   onClose: () => void;
   activeView: 'need' | 'give' | 'all';
   showHeader?: boolean;
+  userId: string; // Add userId prop
 }
 
 export function SupportRequests({ 
@@ -17,12 +20,54 @@ export function SupportRequests({
   onDecline, 
   onClose,
   activeView,
-  showHeader = false
+  showHeader = false,
+  userId
 }: SupportRequestsProps) {
   const pendingRequests = supportRequests.filter(req => req.status === 'pending');
-  
+  const [showNotification, setShowNotification] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    audioRef.current = new Audio('/notification.mp3');
+  }, []);
+
+  useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const channel = supabase
+      .channel('support-requests-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'support_requests',
+          filter: `receiver_id=eq.${userId}`
+        },
+        (payload) => {
+          setShowNotification(true);
+          if (audioRef.current) {
+            audioRef.current.play().catch(() => {});
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   return (
     <div className="space-y-4">
+      {showNotification && (
+        <Notification
+          type="info"
+          message="New support request received!"
+          duration={4000}
+          onClose={() => setShowNotification(false)}
+        />
+      )}
       {showHeader && (
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold text-gray-900">
