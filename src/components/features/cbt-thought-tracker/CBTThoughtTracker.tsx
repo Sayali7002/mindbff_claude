@@ -1,5 +1,12 @@
-import React, { useState } from 'react';
-// Placeholder for Supabase import and types
+import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
+// If you have a shared supabase client, import it instead of creating a new one
+// import { supabase } from '@/lib/supabase';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const EMOTIONS = [
   'Anxiety', 'Fear', 'Sadness', 'Anger', 'Guilt', 'Shame', 'Hurt', 'Frustration', 'Loneliness', 'Hopelessness', 'Other'
@@ -11,6 +18,72 @@ const DISTORTIONS = [
 const STEPS = [
   'Situation', 'Distortions', 'Challenge', 'Reframe', 'Review'
 ];
+
+function EmotionSelector({ emotions, setEmotions, intensities, setIntensities }: any) {
+  return (
+    <div>
+      <label className="block font-semibold mb-1">Emotions</label>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {EMOTIONS.map(e => (
+          <button
+            key={e}
+            type="button"
+            className={`px-2 py-1 rounded border ${emotions.includes(e) ? 'bg-blue-200 border-blue-500' : 'bg-gray-100 border-gray-300'}`}
+            onClick={() => {
+              setEmotions(
+                emotions.includes(e)
+                  ? emotions.filter((em: string) => em !== e)
+                  : [...emotions, e]
+              );
+            }}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+      {emotions.map(e => (
+        <div key={e} className="flex items-center gap-2 mb-1">
+          <span className="w-24">{e}</span>
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={intensities[e] || 5}
+            onChange={ev => setIntensities({ ...intensities, [e]: Number(ev.target.value) })}
+            className="flex-1"
+          />
+          <span>{intensities[e] || 5}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DistortionSelector({ distortions, setDistortions }: any) {
+  return (
+    <div>
+      <label className="block font-semibold mb-1">Cognitive Distortions</label>
+      <div className="flex flex-wrap gap-2">
+        {DISTORTIONS.map(d => (
+          <label key={d} className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={distortions.includes(d)}
+              onChange={() => {
+                setDistortions(
+                  distortions.includes(d)
+                    ? distortions.filter((x: string) => x !== d)
+                    : [...distortions, d]
+                );
+              }}
+            />
+            {d}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function CBTThoughtTracker() {
   const [step, setStep] = useState(0);
@@ -37,11 +110,173 @@ export default function CBTThoughtTracker() {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string|null>(null);
+  const [success, setSuccess] = useState<string|null>(null);
 
-  // TODO: Supabase logic for save/fetch
+  // Fetch history on mount
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  async function fetchHistory() {
+    setLoading(true);
+    setError(null);
+    // Replace 'cbt_thought_records' with your actual Supabase table name
+    const { data, error } = await supabase
+      .from('cbt_thought_records')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) setError('Failed to fetch history');
+    else setHistory(data || []);
+    setLoading(false);
+  }
+
+  async function handleSubmit() {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    // Replace with user id logic if available
+    const user_id = 'demo-user';
+    const record = {
+      id: uuidv4(),
+      user_id,
+      created_at: new Date().toISOString(),
+      situation,
+      ants,
+      emotions,
+      emotion_intensities: emotionIntensities,
+      behaviors,
+      distortions,
+      evidence_for: evidenceFor,
+      evidence_against: evidenceAgainst,
+      alternative,
+      friends_advice: friendsAdvice,
+      likelihood,
+      coping,
+      balanced_thought: balancedThought,
+      reeval_emotions: reevalEmotions,
+      reeval_intensities: reevalIntensities,
+    };
+    const { error } = await supabase.from('cbt_thought_records').insert([record]);
+    if (error) setError('Failed to save record');
+    else {
+      setSuccess('Record saved!');
+      fetchHistory();
+      setStep(4); // Go to review
+    }
+    setLoading(false);
+  }
+
+  function resetForm() {
+    setSituation('');
+    setAnts('');
+    setEmotions([]);
+    setEmotionIntensities({});
+    setBehaviors('');
+    setDistortions([]);
+    setEvidenceFor('');
+    setEvidenceAgainst('');
+    setAlternative('');
+    setFriendsAdvice('');
+    setLikelihood(0);
+    setCoping('');
+    setBalancedThought('');
+    setReevalEmotions([]);
+    setReevalIntensities({});
+    setStep(0);
+    setError(null);
+    setSuccess(null);
+  }
 
   // UI rendering for each step
-  // ... existing code ...
+  let stepContent = null;
+  if (step === 0) {
+    stepContent = (
+      <div className="space-y-4">
+        <div>
+          <label className="block font-semibold mb-1">Situation</label>
+          <textarea className="w-full border rounded p-2" rows={2} value={situation} onChange={e => setSituation(e.target.value)} />
+        </div>
+        <div>
+          <label className="block font-semibold mb-1">Automatic Negative Thoughts (ANTs)</label>
+          <textarea className="w-full border rounded p-2" rows={2} value={ants} onChange={e => setAnts(e.target.value)} />
+        </div>
+        <EmotionSelector emotions={emotions} setEmotions={setEmotions} intensities={emotionIntensities} setIntensities={setEmotionIntensities} />
+        <div>
+          <label className="block font-semibold mb-1">Behaviors</label>
+          <textarea className="w-full border rounded p-2" rows={2} value={behaviors} onChange={e => setBehaviors(e.target.value)} />
+        </div>
+      </div>
+    );
+  } else if (step === 1) {
+    stepContent = (
+      <div className="space-y-4">
+        <DistortionSelector distortions={distortions} setDistortions={setDistortions} />
+      </div>
+    );
+  } else if (step === 2) {
+    stepContent = (
+      <div className="space-y-4">
+        <div>
+          <label className="block font-semibold mb-1">Evidence For</label>
+          <textarea className="w-full border rounded p-2" rows={2} value={evidenceFor} onChange={e => setEvidenceFor(e.target.value)} />
+        </div>
+        <div>
+          <label className="block font-semibold mb-1">Evidence Against</label>
+          <textarea className="w-full border rounded p-2" rows={2} value={evidenceAgainst} onChange={e => setEvidenceAgainst(e.target.value)} />
+        </div>
+        <div>
+          <label className="block font-semibold mb-1">Alternative Explanation</label>
+          <textarea className="w-full border rounded p-2" rows={2} value={alternative} onChange={e => setAlternative(e.target.value)} />
+        </div>
+        <div>
+          <label className="block font-semibold mb-1">Friend's Advice</label>
+          <textarea className="w-full border rounded p-2" rows={2} value={friendsAdvice} onChange={e => setFriendsAdvice(e.target.value)} />
+        </div>
+        <div>
+          <label className="block font-semibold mb-1">Likelihood of Negative Outcome</label>
+          <input type="range" min={0} max={100} value={likelihood} onChange={e => setLikelihood(Number(e.target.value))} className="w-full" />
+          <span>{likelihood}%</span>
+        </div>
+        <div>
+          <label className="block font-semibold mb-1">Coping Strategy</label>
+          <textarea className="w-full border rounded p-2" rows={2} value={coping} onChange={e => setCoping(e.target.value)} />
+        </div>
+      </div>
+    );
+  } else if (step === 3) {
+    stepContent = (
+      <div className="space-y-4">
+        <div>
+          <label className="block font-semibold mb-1">Balanced Thought</label>
+          <textarea className="w-full border rounded p-2" rows={2} value={balancedThought} onChange={e => setBalancedThought(e.target.value)} />
+        </div>
+        <EmotionSelector emotions={reevalEmotions} setEmotions={setReevalEmotions} intensities={reevalIntensities} setIntensities={setReevalIntensities} />
+      </div>
+    );
+  } else if (step === 4) {
+    stepContent = (
+      <div className="space-y-4">
+        <div className="p-4 bg-green-50 rounded">
+          <div className="font-semibold mb-2">Review</div>
+          <div><b>Situation:</b> {situation}</div>
+          <div><b>ANTs:</b> {ants}</div>
+          <div><b>Emotions:</b> {emotions.map(e => `${e} (${emotionIntensities[e] || 5})`).join(', ')}</div>
+          <div><b>Behaviors:</b> {behaviors}</div>
+          <div><b>Distortions:</b> {distortions.join(', ')}</div>
+          <div><b>Evidence For:</b> {evidenceFor}</div>
+          <div><b>Evidence Against:</b> {evidenceAgainst}</div>
+          <div><b>Alternative:</b> {alternative}</div>
+          <div><b>Friend's Advice:</b> {friendsAdvice}</div>
+          <div><b>Likelihood:</b> {likelihood}%</div>
+          <div><b>Coping:</b> {coping}</div>
+          <div><b>Balanced Thought:</b> {balancedThought}</div>
+          <div><b>Re-evaluated Emotions:</b> {reevalEmotions.map(e => `${e} (${reevalIntensities[e] || 5})`).join(', ')}</div>
+        </div>
+        <button className="mt-2 px-4 py-2 bg-blue-500 text-white rounded" onClick={resetForm}>Start New Record</button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto p-4 bg-white rounded-lg shadow">
       <h2 className="text-2xl font-bold mb-4">CBT Thought Tracker</h2>
@@ -50,9 +285,51 @@ export default function CBTThoughtTracker() {
           <div key={label} className={`flex-1 h-2 rounded ${idx <= step ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
         ))}
       </div>
-      {/* Step content here, switch by step */}
-      {/* Navigation buttons */}
-      {/* History section */}
+      {error && <div className="mb-2 text-red-600">{error}</div>}
+      {success && <div className="mb-2 text-green-600">{success}</div>}
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          if (step === 3) handleSubmit();
+          else setStep(step + 1);
+        }}
+        className="space-y-4"
+      >
+        {stepContent}
+        <div className="flex gap-2 mt-4">
+          {step > 0 && step < 4 && (
+            <button type="button" className="px-4 py-2 bg-gray-200 rounded" onClick={() => setStep(step - 1)}>
+              Back
+            </button>
+          )}
+          {step < 3 && (
+            <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded" disabled={loading}>
+              Next
+            </button>
+          )}
+          {step === 3 && (
+            <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded" disabled={loading}>
+              {loading ? 'Saving...' : 'Submit'}
+            </button>
+          )}
+        </div>
+      </form>
+      {/* History Section */}
+      <div className="mt-8">
+        <h3 className="text-lg font-semibold mb-2">Your Past Thought Records</h3>
+        {loading && <div>Loading...</div>}
+        {history.length === 0 && !loading && <div className="text-gray-500">No records yet.</div>}
+        <ul className="space-y-2">
+          {history.map((rec, idx) => (
+            <li key={rec.id || idx} className="p-2 border rounded bg-gray-50">
+              <div className="text-sm text-gray-700"><b>Date:</b> {rec.created_at?.slice(0, 16).replace('T', ' ')}</div>
+              <div className="text-sm"><b>Situation:</b> {rec.situation}</div>
+              <div className="text-sm"><b>Balanced Thought:</b> {rec.balanced_thought}</div>
+              <div className="text-xs text-gray-500">ANTs: {rec.ants}</div>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
