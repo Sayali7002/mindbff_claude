@@ -64,8 +64,7 @@ export function usePeerChat(): UsePeerChatReturn {
     try {
       // Create unique channel name for this conversation (order userId and peerId lexicographically)
       const [idA, idB] = userId < peerId ? [userId, peerId] : [peerId, userId];
-      const channelName = `peer_chat_${idA}_${idB}`; 
-     {/*  const channelName = `peer_chat_${userId}_${peerId}`;*/}
+      const channelName = `peer_chat_${idA}_${idB}`;
       console.log(`Creating channel: ${channelName}`);
 
       // Create subscription that listens for messages in both directions
@@ -76,6 +75,7 @@ export function usePeerChat(): UsePeerChatReturn {
           schema: 'public', 
           table: 'peer_support_chats'
         }, async (payload) => {
+          // On INSERT, fetchMessages is called to fetch the most recent messages for both sender and receiver, ensuring the UI updates in real time.
           console.log('Real-time INSERT received:', payload);
           
           // Check if this message is relevant to our conversation
