@@ -2,8 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-// If you have a shared supabase client, import it instead of creating a new one
-// import { supabase } from '@/lib/supabase';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -16,14 +14,29 @@ const DISTORTIONS = [
   'All-or-Nothing', 'Catastrophizing', 'Overgeneralization', 'Filtering', 'Mind Reading', 'Fortune Telling', 'Personalization', 'Emotional Reasoning', 'Should Statements', 'Labeling'
 ];
 
-const STEPS = [
-  'Situation', 'Distortions', 'Challenge', 'Reframe', 'Review'
+const FIELDS = [
+  { key: 'situation', label: 'Situation', type: 'textarea', prompt: 'Describe the situation that triggered your thoughts.' },
+  { key: 'ants', label: 'Automatic Negative Thoughts (ANTs)', type: 'textarea', prompt: 'What immediate negative thoughts did you have?' },
+  { key: 'emotions', label: 'Emotions', type: 'emotions', prompt: 'What emotions did you feel? Select and rate their intensity.' },
+  { key: 'behaviors', label: 'Behaviors', type: 'textarea', prompt: 'How did you react or what did you feel like doing?' },
+  { key: 'distortions', label: 'Cognitive Distortions', type: 'distortions', prompt: 'Which cognitive distortions might be present?' },
+  { key: 'evidenceFor', label: 'Evidence For', type: 'textarea', prompt: 'What factual evidence supports your negative thought?' },
+  { key: 'evidenceAgainst', label: 'Evidence Against', type: 'textarea', prompt: 'What factual evidence contradicts your negative thought?' },
+  { key: 'alternative', label: 'Alternative Explanation', type: 'textarea', prompt: 'What are some other possible explanations?' },
+  { key: 'friendsAdvice', label: 'Friend’s Advice', type: 'textarea', prompt: 'What would you tell a friend in this situation?' },
+  { key: 'likelihood', label: 'Likelihood', type: 'slider', prompt: 'How likely is the negative outcome? (0-100%)' },
+  { key: 'coping', label: 'Coping Strategy', type: 'textarea', prompt: 'How could you cope if the worst happened?' },
+  { key: 'balancedThought', label: 'Balanced Thought', type: 'textarea', prompt: 'Create a new, more realistic thought.' },
+  { key: 'reevalEmotions', label: 'Re-evaluate Emotions', type: 'emotions', prompt: 'How do you feel now? Select and rate intensity.' },
 ];
+
+function AILabel() {
+  return <span className="ml-1 inline-block align-middle" title="AI suggestion">🤖</span>;
+}
 
 function EmotionSelector({ emotions, setEmotions, intensities, setIntensities }: any) {
   return (
     <div>
-      <label className="block font-semibold mb-1">Emotions</label>
       <div className="flex flex-wrap gap-2 mb-2">
         {EMOTIONS.map(e => (
           <button
@@ -63,7 +76,6 @@ function EmotionSelector({ emotions, setEmotions, intensities, setIntensities }:
 function DistortionSelector({ distortions, setDistortions }: any) {
   return (
     <div>
-      <label className="block font-semibold mb-1">Cognitive Distortions</label>
       <div className="flex flex-wrap gap-2">
         {DISTORTIONS.map(d => (
           <label key={d} className="flex items-center gap-1">
@@ -86,132 +98,106 @@ function DistortionSelector({ distortions, setDistortions }: any) {
   );
 }
 
-function AILabel() {
-  return <span className="ml-1 inline-block align-middle" title="AI suggestion">🤖</span>;
-}
-
 export default function CBTThoughtTracker() {
-  const [step, setStep] = useState(0);
-  // Step 1
+  // State for each field
   const [situation, setSituation] = useState('');
   const [ants, setAnts] = useState('');
   const [emotions, setEmotions] = useState<string[]>([]);
   const [emotionIntensities, setEmotionIntensities] = useState<{[k: string]: number}>({});
   const [behaviors, setBehaviors] = useState('');
-  // Step 2
   const [distortions, setDistortions] = useState<string[]>([]);
-  // Step 3
   const [evidenceFor, setEvidenceFor] = useState('');
   const [evidenceAgainst, setEvidenceAgainst] = useState('');
   const [alternative, setAlternative] = useState('');
   const [friendsAdvice, setFriendsAdvice] = useState('');
   const [likelihood, setLikelihood] = useState(0);
   const [coping, setCoping] = useState('');
-  // Step 4
   const [balancedThought, setBalancedThought] = useState('');
   const [reevalEmotions, setReevalEmotions] = useState<string[]>([]);
   const [reevalIntensities, setReevalIntensities] = useState<{[k: string]: number}>({});
-  // Review/history
+
+  // Step state
+  const [step, setStep] = useState(0);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string|null>(null);
   const [success, setSuccess] = useState<string|null>(null);
 
   // AI state
-  const [aiDistortionLoading, setAIDistortionLoading] = useState(false);
-  const [aiChallengePrompts, setAIChallengePrompts] = useState<string[]>([]);
-  const [aiChallengeLoading, setAIChallengeLoading] = useState(false);
-  const [aiBalancedSuggestions, setAIBalancedSuggestions] = useState<string[]>([]);
-  const [aiBalancedLoading, setAIBalancedLoading] = useState(false);
+  const [aiSuggestions, setAISuggestions] = useState<string[]>([]);
+  const [aiLoading, setAILoading] = useState(false);
   const [aiError, setAIError] = useState<string|null>(null);
+
+  // Compose context for AI
+  function getContextForAI(fieldKey: string) {
+    const context: Record<string, any> = {
+      situation,
+      ants,
+      emotions: emotions.join(', '),
+      emotionIntensities,
+      behaviors,
+      distortions: distortions.join(', '),
+      evidenceFor,
+      evidenceAgainst,
+      alternative,
+      friendsAdvice,
+      likelihood,
+      coping,
+      balancedThought,
+      reevalEmotions: reevalEmotions.join(', '),
+      reevalIntensities,
+    };
+    // Only include up to the previous field
+    const idx = FIELDS.findIndex(f => f.key === fieldKey);
+    const keys = FIELDS.slice(0, idx).map(f => f.key);
+    const prevContext = keys.map(k => `${FIELDS.find(f => f.key === k)?.label}: ${context[k] || ''}`).join('\n');
+    return prevContext;
+  }
+
+  // Fetch AI suggestions for the current step
+  useEffect(() => {
+    setAISuggestions([]);
+    setAIError(null);
+    setAILoading(false);
+    if (step >= FIELDS.length) return;
+    const field = FIELDS[step];
+    // Only fetch for textareas, slider, or distortions
+    if (['textarea', 'slider', 'distortions'].includes(field.type)) {
+      setAILoading(true);
+      const prevContext = getContextForAI(field.key);
+      fetch('/api/cbt-gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'field_suggestion',
+          field: field.key,
+          context: prevContext,
+          prompt: field.prompt,
+        }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.response) {
+            const suggestions = data.response.split(/\n|\d+\. /).map((s: string) => s.trim()).filter(Boolean);
+            setAISuggestions(suggestions);
+          } else if (data.error) {
+            setAIError(data.error);
+          }
+        })
+        .catch(err => setAIError('AI error: ' + err.message))
+        .finally(() => setAILoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   // Fetch history on mount
   useEffect(() => {
     fetchHistory();
   }, []);
 
-  // Step 2: Suggest distortions after ANTs entered
-  useEffect(() => {
-    if (step === 1 && ants.trim()) {
-      setAIDistortionLoading(true);
-      setAIError(null);
-      fetch('/api/cbt-gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'distortion_suggestion', ants }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.response) {
-            // Parse comma-separated list
-            const suggestions = data.response.split(',').map((d: string) => d.trim()).filter(Boolean);
-            setDistortions(suggestions);
-          } else if (data.error) {
-            setAIError(data.error);
-          }
-        })
-        .catch(err => setAIError('AI error: ' + err.message))
-        .finally(() => setAIDistortionLoading(false));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, ants]);
-
-  // Step 3: Challenge prompts
-  useEffect(() => {
-    if (step === 2 && ants.trim() && distortions.length > 0) {
-      setAIChallengeLoading(true);
-      setAIError(null);
-      fetch('/api/cbt-gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'challenge_prompt', ants, distortions: distortions.join(', ') }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.response) {
-            // Split into lines or numbered list
-            const prompts = data.response.split(/\n|\d+\. /).map((p: string) => p.trim()).filter(Boolean);
-            setAIChallengePrompts(prompts);
-          } else if (data.error) {
-            setAIError(data.error);
-          }
-        })
-        .catch(err => setAIError('AI error: ' + err.message))
-        .finally(() => setAIChallengeLoading(false));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, ants, distortions]);
-
-  // Step 4: Balanced thought suggestions
-  useEffect(() => {
-    if (step === 3 && ants.trim() && distortions.length > 0 && evidenceAgainst.trim()) {
-      setAIBalancedLoading(true);
-      setAIError(null);
-      fetch('/api/cbt-gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'balanced_thought', ants, distortions: distortions.join(', '), evidenceAgainst }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.response) {
-            // Split numbered list
-            const suggestions = data.response.split(/\n|\d+\. /).map((s: string) => s.trim()).filter(Boolean);
-            setAIBalancedSuggestions(suggestions);
-          } else if (data.error) {
-            setAIError(data.error);
-          }
-        })
-        .catch(err => setAIError('AI error: ' + err.message))
-        .finally(() => setAIBalancedLoading(false));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, ants, distortions, evidenceAgainst]);
-
   async function fetchHistory() {
     setLoading(true);
     setError(null);
-    // Replace 'cbt_thought_records' with your actual Supabase table name
     const { data, error } = await supabase
       .from('cbt_thought_records')
       .select('*')
@@ -225,7 +211,6 @@ export default function CBTThoughtTracker() {
     setLoading(true);
     setError(null);
     setSuccess(null);
-    // Replace with user id logic if available
     const user_id = 'demo-user';
     const record = {
       id: uuidv4(),
@@ -252,7 +237,7 @@ export default function CBTThoughtTracker() {
     else {
       setSuccess('Record saved!');
       fetchHistory();
-      setStep(4); // Go to review
+      setStep(FIELDS.length); // Go to review
     }
     setLoading(false);
   }
@@ -278,117 +263,112 @@ export default function CBTThoughtTracker() {
     setSuccess(null);
   }
 
-  // UI rendering for each step
+  // Render current step
   let stepContent = null;
-  if (step === 0) {
+  const field = FIELDS[step];
+  if (step < FIELDS.length) {
     stepContent = (
       <div className="space-y-4">
-        <div>
-          <label className="block font-semibold mb-1">Situation</label>
-          <textarea className="w-full border rounded p-2" rows={2} value={situation} onChange={e => setSituation(e.target.value)} />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Automatic Negative Thoughts (ANTs)</label>
-          <textarea className="w-full border rounded p-2" rows={2} value={ants} onChange={e => setAnts(e.target.value)} />
-        </div>
-        <EmotionSelector emotions={emotions} setEmotions={setEmotions} intensities={emotionIntensities} setIntensities={setEmotionIntensities} />
-        <div>
-          <label className="block font-semibold mb-1">Behaviors</label>
-          <textarea className="w-full border rounded p-2" rows={2} value={behaviors} onChange={e => setBehaviors(e.target.value)} />
-        </div>
-      </div>
-    );
-  } else if (step === 1) {
-    stepContent = (
-      <div className="space-y-4">
-        <DistortionSelector distortions={distortions} setDistortions={setDistortions} />
-        {aiDistortionLoading && <div className="text-center text-gray-500">Loading AI suggestions...</div>}
-        {aiError && <div className="text-center text-red-600">{aiError}</div>}
-      </div>
-    );
-  } else if (step === 2) {
-    stepContent = (
-      <div className="space-y-4">
-        <div>
-          <label className="block font-semibold mb-1">Evidence For</label>
-          <textarea className="w-full border rounded p-2" rows={2} value={evidenceFor} onChange={e => setEvidenceFor(e.target.value)} />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Evidence Against</label>
-          <textarea className="w-full border rounded p-2" rows={2} value={evidenceAgainst} onChange={e => setEvidenceAgainst(e.target.value)} />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Alternative Explanation</label>
-          <textarea className="w-full border rounded p-2" rows={2} value={alternative} onChange={e => setAlternative(e.target.value)} />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Friend's Advice</label>
-          <textarea className="w-full border rounded p-2" rows={2} value={friendsAdvice} onChange={e => setFriendsAdvice(e.target.value)} />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Likelihood of Negative Outcome</label>
-          <input type="range" min={0} max={100} value={likelihood} onChange={e => setLikelihood(Number(e.target.value))} className="w-full" />
-          <span>{likelihood}%</span>
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">Coping Strategy</label>
-          <textarea className="w-full border rounded p-2" rows={2} value={coping} onChange={e => setCoping(e.target.value)} />
-        </div>
-        {aiChallengeLoading && <div className="text-center text-gray-500">Loading AI challenge prompts...</div>}
-        {aiError && <div className="text-center text-red-600">{aiError}</div>}
-        {aiChallengePrompts.length > 0 && (
-          <div className="bg-blue-50 p-3 rounded-lg">
-            <h4 className="font-semibold mb-2">AI Challenge Prompts</h4>
-            <ul className="list-disc list-inside space-y-1">
-              {aiChallengePrompts.map((prompt, idx) => (
-                <li key={idx}>
-                  <span>{prompt}</span>
-                  <button
-                    type="button"
-                    className="ml-2 px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs"
-                    onClick={() => setAlternative(prompt)}
-                  >
-                    Use
-                  </button>
-                </li>
-              ))}
-            </ul>
+        <label className="block font-semibold mb-1">{field.label}</label>
+        {field.type === 'textarea' && (
+          <textarea
+            className="w-full border rounded p-2"
+            rows={3}
+            value={(() => {
+              switch (field.key) {
+                case 'situation': return situation;
+                case 'ants': return ants;
+                case 'behaviors': return behaviors;
+                case 'evidenceFor': return evidenceFor;
+                case 'evidenceAgainst': return evidenceAgainst;
+                case 'alternative': return alternative;
+                case 'friendsAdvice': return friendsAdvice;
+                case 'coping': return coping;
+                case 'balancedThought': return balancedThought;
+                default: return '';
+              }
+            })()}
+            onChange={e => {
+              switch (field.key) {
+                case 'situation': setSituation(e.target.value); break;
+                case 'ants': setAnts(e.target.value); break;
+                case 'behaviors': setBehaviors(e.target.value); break;
+                case 'evidenceFor': setEvidenceFor(e.target.value); break;
+                case 'evidenceAgainst': setEvidenceAgainst(e.target.value); break;
+                case 'alternative': setAlternative(e.target.value); break;
+                case 'friendsAdvice': setFriendsAdvice(e.target.value); break;
+                case 'coping': setCoping(e.target.value); break;
+                case 'balancedThought': setBalancedThought(e.target.value); break;
+                default: break;
+              }
+            }}
+          />
+        )}
+        {field.type === 'emotions' && (
+          <EmotionSelector
+            emotions={field.key === 'emotions' ? emotions : reevalEmotions}
+            setEmotions={field.key === 'emotions' ? setEmotions : setReevalEmotions}
+            intensities={field.key === 'emotions' ? emotionIntensities : reevalIntensities}
+            setIntensities={field.key === 'emotions' ? setEmotionIntensities : setReevalIntensities}
+          />
+        )}
+        {field.type === 'distortions' && (
+          <DistortionSelector distortions={distortions} setDistortions={setDistortions} />
+        )}
+        {field.type === 'slider' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={likelihood}
+              onChange={e => setLikelihood(Number(e.target.value))}
+              className="flex-1"
+            />
+            <span>{likelihood}%</span>
           </div>
         )}
-      </div>
-    );
-  } else if (step === 3) {
-    stepContent = (
-      <div className="space-y-4">
+        {/* AI Suggestions */}
         <div>
-          <label className="block font-semibold mb-1">Balanced Thought</label>
-          <textarea className="w-full border rounded p-2" rows={2} value={balancedThought} onChange={e => setBalancedThought(e.target.value)} />
+          {aiLoading && <div className="text-center text-gray-500">Loading AI suggestions...</div>}
+          {aiError && <div className="text-center text-red-600">{aiError}</div>}
+          {aiSuggestions.length > 0 && (
+            <div className="bg-blue-50 p-3 rounded-lg mt-2">
+              <div className="text-sm text-gray-700 flex items-center mb-1"><AILabel /> Suggestions:</div>
+              <ul className="list-disc list-inside space-y-1">
+                {aiSuggestions.map((s, idx) => (
+                  <li key={idx} className="flex items-center gap-2">
+                    <span>{s}</span>
+                    <button
+                      type="button"
+                      className="ml-2 px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs"
+                      onClick={() => {
+                        switch (field.key) {
+                          case 'situation': setSituation(s); break;
+                          case 'ants': setAnts(s); break;
+                          case 'behaviors': setBehaviors(s); break;
+                          case 'evidenceFor': setEvidenceFor(s); break;
+                          case 'evidenceAgainst': setEvidenceAgainst(s); break;
+                          case 'alternative': setAlternative(s); break;
+                          case 'friendsAdvice': setFriendsAdvice(s); break;
+                          case 'coping': setCoping(s); break;
+                          case 'balancedThought': setBalancedThought(s); break;
+                          default: break;
+                        }
+                      }}
+                    >
+                      Use
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-        <EmotionSelector emotions={reevalEmotions} setEmotions={setReevalEmotions} intensities={reevalIntensities} setIntensities={setReevalIntensities} />
-        {aiBalancedLoading && <div className="text-center text-gray-500">Loading AI balanced thought suggestions...</div>}
-        {aiError && <div className="text-center text-red-600">{aiError}</div>}
-        {aiBalancedSuggestions.length > 0 && (
-          <div className="bg-green-50 p-3 rounded-lg">
-            <h4 className="font-semibold mb-2">AI Balanced Thought Suggestions</h4>
-            <ul className="list-disc list-inside space-y-1">
-              {aiBalancedSuggestions.map((suggestion, idx) => (
-                <li key={idx}>
-                  <span>{suggestion}</span>
-                  <button
-                    type="button"
-                    className="ml-2 px-2 py-1 bg-green-200 text-green-800 rounded text-xs"
-                    onClick={() => setBalancedThought(suggestion)}
-                  >
-                    Use
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
     );
-  } else if (step === 4) {
+  } else {
+    // Review step
     stepContent = (
       <div className="space-y-4">
         <div className="p-4 bg-green-50 rounded">
@@ -412,37 +392,41 @@ export default function CBTThoughtTracker() {
     );
   }
 
+  // Progress bar
+  const progress = Math.round((step / FIELDS.length) * 100);
+
   return (
     <div className="max-w-2xl mx-auto p-4 bg-white rounded-lg shadow">
       <h2 className="text-2xl font-bold mb-4">CBT Thought Tracker</h2>
       <div className="mb-4 flex items-center gap-2">
-        {STEPS.map((label, idx) => (
-          <div key={label} className={`flex-1 h-2 rounded ${idx <= step ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
-        ))}
+        <div className="flex-1 h-2 rounded bg-gray-200 relative">
+          <div className="h-2 rounded bg-blue-500" style={{ width: `${progress}%` }}></div>
+        </div>
+        <span className="ml-2 text-sm text-gray-600">Step {Math.min(step + 1, FIELDS.length + 1)} / {FIELDS.length + 1}</span>
       </div>
       {error && <div className="mb-2 text-red-600">{error}</div>}
       {success && <div className="mb-2 text-green-600">{success}</div>}
       <form
         onSubmit={e => {
           e.preventDefault();
-          if (step === 3) handleSubmit();
+          if (step === FIELDS.length) handleSubmit();
           else setStep(step + 1);
         }}
         className="space-y-4"
       >
         {stepContent}
         <div className="flex gap-2 mt-4">
-          {step > 0 && step < 4 && (
+          {step > 0 && step <= FIELDS.length && (
             <button type="button" className="px-4 py-2 bg-gray-200 rounded" onClick={() => setStep(step - 1)}>
               Back
             </button>
           )}
-          {step < 3 && (
+          {step < FIELDS.length && (
             <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded" disabled={loading}>
               Next
             </button>
           )}
-          {step === 3 && (
+          {step === FIELDS.length && (
             <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded" disabled={loading}>
               {loading ? 'Saving...' : 'Submit'}
             </button>
