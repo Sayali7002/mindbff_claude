@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'; //
 import { formatSupportRequests } from '@/lib/peer-support/transformers'; // Keep existing imports
 import { withAuth } from '../../auth-middleware'; // Keep existing imports
 import { Database } from '@/lib/supabase'; // Import your Database type
+import { sendResendEmail } from '@/lib/email'; // Add this import at the top
 
 // Get all support requests for the current user
 export async function GET(request: NextRequest) {
